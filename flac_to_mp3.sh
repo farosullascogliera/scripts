@@ -8,6 +8,11 @@ if ! command -v ffmpeg &>/dev/null; then
     exit 1
 fi
 
+if ! command -v rsync &>/dev/null; then
+    echo "Error: rsync is not installed." >&2
+    exit 1
+fi
+
 export SOURCE_DIR DEST_DIR
 
 convert_file() {
@@ -41,32 +46,38 @@ convert_file() {
     fi
 }
 
-export -f convert_file
+copy_file() {
+    other_file="$1"
+    relative="${other_file#"$SOURCE_DIR"/}"
+    dest_file="$DEST_DIR/$relative"
+
+    mkdir -p "$(dirname "$dest_file")"
+
+    if [[ -f "$dest_file" ]]; then
+        echo "Skipping (exists): $dest_file"
+        return
+    fi
+
+    echo "Copying: $relative"
+    rsync -a --ignore-existing "$other_file" "$dest_file"
+}
+
+export -f convert_file copy_file
 
 # Convert FLAC files in parallel
 find "$SOURCE_DIR" -type f -name "*.flac" -print0 \
     | xargs -0 -P "$(nproc)" -I {} bash -c 'convert_file "$@"' _ {}
 
-# Copy non-FLAC files as-is
-find "$SOURCE_DIR" -type f ! -name "*.flac" -print0 | while IFS= read -r -d '' other_file; do
-    relative="${other_file#"$SOURCE_DIR"/}"
-    dest_file="$DEST_DIR/$relative"
-    mkdir -p "$(dirname "$dest_file")"
-    if [[ -f "$dest_file" ]]; then
-        echo "Skipping (exists): $dest_file"
-        continue
-    fi
-    echo "Copying: $relative"
-    cp "$other_file" "$dest_file"
-done
+# Copy non-FLAC files in parallel
+find "$SOURCE_DIR" -type f ! -name "*.flac" -print0 \
+    | xargs -0 -P "$(nproc)" -I {} bash -c 'copy_file "$@"' _ {}
 
 # Rename folders: remove " [FLAC]" and " FLAC" from directory names
-# -depth ensures children are processed before parents
 find "$DEST_DIR" -depth -type d | while IFS= read -r dir; do
     parent="$(dirname "$dir")"
     base="$(basename "$dir")"
-    newbase="${base/ \[FLAC\]/}"   # remove " [FLAC]" first
-    newbase="${newbase/ FLAC/}"    # then remove " FLAC"
+    newbase="${base/ \[FLAC\]/}"
+    newbase="${newbase/ FLAC/}"
     if [[ "$newbase" != "$base" ]]; then
         mv -- "$dir" "$parent/$newbase"
         echo "Renamed: $base → $newbase"
