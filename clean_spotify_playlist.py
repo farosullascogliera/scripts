@@ -10,7 +10,7 @@ output_file = sys.argv[2]
 
 remove = {
     'Disc Number', 'Track Number', 'Track Duration (ms)',
-    'Explicit', 'Popularity', 'ISRC', 'Added By', 'Added At'
+    'Explicit', 'Popularity', 'ISRC', 'Added By', 'Added At', 'Album Artist Name(s)'
 }
 
 with open(input_file, newline='', encoding='utf-8') as fin, \
