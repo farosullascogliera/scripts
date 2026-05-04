@@ -34,7 +34,6 @@ convert_file() {
         -b:a 320k \
         -map_metadata 0 \
         -id3v2_version 3 \
-        -q:a 0 \
         -y \
         "$mp3_file" \
         -loglevel error
